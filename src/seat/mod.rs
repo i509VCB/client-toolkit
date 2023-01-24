@@ -1,6 +1,7 @@
 #[cfg(feature = "xkbcommon")]
 pub mod keyboard;
 pub mod pointer;
+pub mod relative_pointer;
 pub mod touch;
 
 use std::{
@@ -134,7 +135,7 @@ impl SeatState {
         seat: &wl_seat::WlSeat,
         theme: ThemeSpec,
         scale: i32,
-    ) -> Result<(wl_pointer::WlPointer, ThemedPointer), SeatError>
+    ) -> Result<(wl_pointer::WlPointer, ThemedPointer<PointerData>), SeatError>
     where
         D: Dispatch<wl_pointer::WlPointer, PointerData> + PointerHandler + 'static,
     {
@@ -178,7 +179,7 @@ impl SeatState {
         theme: ThemeSpec,
         scale: i32,
         pointer_data: U,
-    ) -> Result<(wl_pointer::WlPointer, ThemedPointer), SeatError>
+    ) -> Result<(wl_pointer::WlPointer, ThemedPointer<U>), SeatError>
     where
         D: Dispatch<wl_pointer::WlPointer, U> + PointerHandler + 'static,
         U: PointerDataExt + 'static,
@@ -197,6 +198,7 @@ impl SeatState {
                 themes: Arc::new(Mutex::new(Themes::new(theme))),
                 pointer: wl_ptr,
                 scale,
+                _marker: std::marker::PhantomData,
             },
         ))
     }

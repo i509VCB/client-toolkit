@@ -28,6 +28,7 @@ use wayland_client::{
     protocol::{wl_keyboard, wl_output, wl_pointer, wl_seat, wl_shm, wl_surface},
     Connection, QueueHandle,
 };
+use xkbcommon::xkb::keysyms;
 
 fn main() {
     env_logger::init();
@@ -290,6 +291,10 @@ impl KeyboardHandler for SimpleLayer {
         event: KeyEvent,
     ) {
         println!("Key press: {:?}", event);
+        // press 'esc' to exit
+        if event.keysym == keysyms::KEY_Escape {
+            self.exit = true;
+        }
     }
 
     fn release_key(

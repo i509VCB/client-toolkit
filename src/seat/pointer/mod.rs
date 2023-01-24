@@ -119,6 +119,13 @@ pub struct PointerData {
     pub(crate) inner: Mutex<PointerDataInner>,
 }
 
+impl PointerData {
+    /// The latest serial from the `Enter` event.
+    pub fn latest_enter_serial(&self) -> Option<u32> {
+        self.inner.lock().unwrap().latest_enter
+    }
+}
+
 pub trait PointerDataExt: Send + Sync {
     fn pointer_data(&self) -> &PointerData;
 }
@@ -153,13 +160,14 @@ macro_rules! delegate_pointer {
 pub(crate) struct PointerDataInner {
     /// Surface the pointer most recently entered
     pub(crate) surface: Option<wl_surface::WlSurface>,
+
     /// Position relative to the surface
     pub(crate) position: (f64, f64),
 
     /// List of pending events.  Only used for version >= 5.
     pub(crate) pending: SmallVec<[PointerEvent; 3]>,
 
-    /// the serial of the latest enter event for the pointer
+    /// The serial of the latest enter event for the pointer
     pub(crate) latest_enter: Option<u32>,
 }
 
@@ -355,13 +363,14 @@ where
 
 /// Pointer themeing
 #[derive(Debug)]
-pub struct ThemedPointer {
+pub struct ThemedPointer<U = PointerData> {
     pub(super) themes: Arc<Mutex<Themes>>,
     pub(super) pointer: wl_pointer::WlPointer,
     pub(super) scale: i32,
+    pub(super) _marker: std::marker::PhantomData<U>,
 }
 
-impl ThemedPointer {
+impl<U: PointerDataExt + 'static> ThemedPointer<U> {
     pub fn set_cursor(
         &self,
         conn: &Connection,
@@ -395,20 +404,13 @@ impl ThemedPointer {
         surface.commit();
 
         // Set the pointer surface to change the pointer.
-        let serial = if let Some(serial) = self
-            .pointer
-            .data::<PointerData>()
-            .and_then(|ptr_data| ptr_data.inner.lock().ok())
-            .and_then(|data_inner| data_inner.latest_enter)
-        {
-            serial
+        let data = self.pointer.data::<U>();
+        if let Some(serial) = data.and_then(|data| data.pointer_data().latest_enter_serial()) {
+            self.pointer.set_cursor(serial, Some(surface), hx as i32, hy as i32);
+            Ok(())
         } else {
-            return Err(PointerThemeError::MissingEnterSerial);
-        };
-
-        self.pointer.set_cursor(serial, Some(surface), hx as i32, hy as i32);
-
-        Ok(())
+            Err(PointerThemeError::MissingEnterSerial)
+        }
     }
 
     pub fn pointer(&self) -> &wl_pointer::WlPointer {
